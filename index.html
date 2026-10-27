@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>E-Nilai Digital - TP & ATS</title>
-    <link rel="icon" type="image/svg+xml" href="logo.svg">
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- FontAwesome Icons -->
@@ -32,8 +31,18 @@
             width: 70px;
             text-align: center;
         }
+        /* Style Banner Demo Mode */
+        .demo-banner {
+            background: linear-gradient(90deg, #d97706, #b45309);
+            color: #ffffff;
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 8px 16px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
         @media print {
-            .no-print, .nav, .btn, .card-header, .filter-bar, header, nav, .panel-switcher {
+            .no-print, .nav, .btn, .card-header, .filter-bar, header, nav, .panel-switcher, .demo-banner {
                 display: none !important;
             }
             body { background-color: #fff !important; padding: 0 !important; }
@@ -43,6 +52,12 @@
     </style>
 </head>
 <body>
+
+    <!-- Banner Notifikasi Mode Demo (Otomatis muncul jika ?demo=true) -->
+    <div id="demoBanner" class="demo-banner d-none no-print">
+        <i class="fa-solid fa-flask me-2"></i>
+        <strong>MODE DEMO PRATINJAU:</strong> Ini adalah versi simulasi dengan data contoh. Semua perubahan data tidak akan tersimpan secara permanen ke database asli.
+    </div>
 
     <!-- Header / Navbar Utama -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary no-print mb-3 shadow-sm">
@@ -89,11 +104,11 @@
                                 <i class="fa-solid fa-search me-1"></i> Cari Nilai
                             </button>
                         </div>
-                        <small class="text-muted">Contoh: 0081234501 atau Ahmad Fauzi</small>
+                        <small id="searchHint" class="text-muted">Contoh: 0081234501 atau Ahmad Fauzi</small>
                     </div>
                 </div>
 
-                <!-- tempat hasil pencarian rapor -->
+                <!-- Tempat hasil pencarian rapor -->
                 <div id="portalResultArea"></div>
             </div>
         </div>
@@ -156,7 +171,7 @@
                     </li>
                 </ul>
 
-                <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalSettings">
+                <button class="btn btn-outline-secondary btn-sm" onclick="openSettingsModal()">
                     <i class="fa-solid fa-gear me-1"></i> Pengaturan Firebase/AI
                 </button>
             </div>
@@ -185,7 +200,7 @@
                                     </div>
                                     <form id="formMaster" onsubmit="handleSaveMaster(event)">
                                         <div id="masterFields"></div>
-                                        <button type="submit" class="btn btn-primary w-100 mt-3">
+                                        <button type="submit" id="btnSaveMaster" class="btn btn-primary w-100 mt-3">
                                             <i class="fa-solid fa-floppy-disk me-1"></i> Simpan Data
                                         </button>
                                     </form>
@@ -195,7 +210,7 @@
                                         <button class="btn btn-outline-success btn-sm w-100 mb-2" onclick="downloadExcelTemplate()">
                                             <i class="fa-solid fa-download me-1"></i> Unduh Template Excel
                                         </button>
-                                        <input type="file" class="form-control form-control-sm" accept=".xlsx, .xls" onchange="handleExcelUpload(event)">
+                                        <input type="file" id="inputExcel" class="form-control form-control-sm" accept=".xlsx, .xls" onchange="handleExcelUpload(event)">
                                     </div>
                                 </div>
                             </div>
@@ -205,7 +220,7 @@
                             <div class="card shadow-sm h-100">
                                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                                     <h5 class="card-title mb-0 fw-bold">Daftar Data (<span id="masterTableLabel">Tahun Ajaran</span>)</h5>
-                                    <button class="btn btn-outline-danger btn-sm" onclick="clearCurrentMaster()">
+                                    <button class="btn btn-outline-danger btn-sm" id="btnClearMaster" onclick="clearCurrentMaster()">
                                         <i class="fa-solid fa-trash me-1"></i> Bersihkan Kategori Ini
                                     </button>
                                 </div>
@@ -347,6 +362,11 @@
         import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         window.initFirebaseSystem = function(configObj) {
+            // Dalam mode demo, pengisian Firebase dari luar diabaikan agar data aman
+            if(window.isDemoMode) {
+                console.warn("Mode Demo Aktif: Pengubahan Firebase dinonaktifkan.");
+                return;
+            }
             try {
                 const app = initializeApp(configObj);
                 window.firebaseDb = getDatabase(app);
@@ -363,6 +383,36 @@
         const ADMIN_PASSWORD = "240785";
         let isAdminLoggedIn = false;
 
+        // 1. Deteksi Mode Demo dari Parameter URL (?demo=true / ?mode=demo / ?demo=1)
+        const urlParams = new URLSearchParams(window.location.search);
+        const isDemoMode = urlParams.get('demo') === 'true' || urlParams.get('demo') === '1' || urlParams.get('mode') === 'demo';
+        window.isDemoMode = isDemoMode;
+
+        // Data Contoh / Dummy Khusus Mode Demo (Lengkap & Siap Tampil)
+        const dummyStore = {
+            tahun: ['2024/2025', '2025/2026'],
+            kelas: ['VII A', 'VII B', 'VIII A'],
+            mapel: ['Matematika', 'Bahasa Indonesia', 'IPA'],
+            tp: [
+                { id: 'tp1', mapel: 'Matematika', kode: 'TP 1', deskripsi: 'Memahami konsep aljabar dan variabel' },
+                { id: 'tp2', mapel: 'Matematika', kode: 'TP 2', deskripsi: 'Menyelesaikan persamaan linier satu variabel' },
+                { id: 'tp3', mapel: 'Bahasa Indonesia', kode: 'TP 1', deskripsi: 'Menganalisis teks deskripsi dan narasi' },
+                { id: 'tp4', mapel: 'IPA', kode: 'TP 1', deskripsi: 'Mengidentifikasi sistem organisasi kehidupan' }
+            ],
+            siswa: [
+                { id: 's1', nisn: '0081234501', nama: 'Ahmad Fauzi', kelas: 'VII A' },
+                { id: 's2', nisn: '0081234502', nama: 'Bunga Citra', kelas: 'VII A' },
+                { id: 's3', nisn: '0081234503', nama: 'Budi Santoso', kelas: 'VII A' },
+                { id: 's4', nisn: '0081234504', nama: 'Siti Rahma', kelas: 'VII B' }
+            ],
+            nilai: {
+                '2025/2026_Ganjil_VII A_Matematika_s1': { 'tp1': 88, 'tp2': 90, 'ats': 85 },
+                '2025/2026_Ganjil_VII A_Matematika_s2': { 'tp1': 78, 'tp2': 82, 'ats': 80 },
+                '2025/2026_Ganjil_VII A_Matematika_s3': { 'tp1': 92, 'tp2': 95, 'ats': 90 }
+            }
+        };
+
+        // Storage Default Versi Normal
         let store = {
             tahun: ['2024/2025', '2025/2026'],
             kelas: ['VII A', 'VII B', 'VIII A'],
@@ -379,11 +429,20 @@
         };
 
         function loadLocalStore() {
+            if(isDemoMode) {
+                // Di Mode Demo: Pakai data contoh dummy, jangan baca localStorage asli
+                store = JSON.parse(JSON.stringify(dummyStore));
+                return;
+            }
             const saved = localStorage.getItem('e_nilai_store');
             if(saved) { try { store = JSON.parse(saved); } catch(e){} }
         }
 
         function saveLocalStore() {
+            if(isDemoMode) {
+                // Di Mode Demo: Cegah penyimpanan ke localStorage maupun Firebase
+                return;
+            }
             localStorage.setItem('e_nilai_store', JSON.stringify(store));
             if(window.firebaseDb) {
                 try { window.fbSet(window.fbRef(window.firebaseDb, 'appStore'), store); } catch(e){}
@@ -391,6 +450,23 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            if (isDemoMode) {
+                // Tampilkan Banner Notifikasi Mode Demo
+                const banner = document.getElementById('demoBanner');
+                if(banner) banner.classList.remove('d-none');
+                
+                // Ubah Tampilan Badge Status Database
+                const badge = document.getElementById('dbStatusBadge');
+                if(badge) {
+                    badge.className = "badge bg-warning text-dark status-badge me-2";
+                    badge.innerHTML = `<i class="fa-solid fa-flask me-1"></i> Mode Demo (Simulasi)`;
+                }
+
+                // Perbarui hint teks pencarian
+                const hint = document.getElementById('searchHint');
+                if(hint) hint.innerHTML = 'Contoh Demo: <strong>0081234501</strong> atau <strong>Ahmad Fauzi</strong> (Klik "Cari Nilai")';
+            }
+
             loadLocalStore();
             initFilters();
             renderMasterUI();
@@ -416,7 +492,8 @@
         }
 
         function openAdminAuthModal() {
-            if(isAdminLoggedIn) {
+            if(isAdminLoggedIn || isDemoMode) {
+                // Jika Mode Demo, izinkan akses panel admin langsung agar pembaca blog dapat meninjau fitur admin
                 switchPanel('admin');
             } else {
                 const modal = new bootstrap.Modal(document.getElementById('modalAuthAdmin'));
@@ -444,6 +521,15 @@
             document.getElementById('globalTahun').innerHTML = store.tahun.map(t => `<option value="${t}">${t}</option>`).join('');
             document.getElementById('globalKelas').innerHTML = store.kelas.map(k => `<option value="${k}">${k}</option>`).join('');
             document.getElementById('globalMapel').innerHTML = store.mapel.map(m => `<option value="${m}">${m}</option>`).join('');
+            
+            // Set default pilihan di mode demo agar langsung terisi nilai
+            if(isDemoMode) {
+                document.getElementById('globalTahun').value = '2025/2026';
+                document.getElementById('globalSemester').value = 'Ganjil';
+                document.getElementById('globalKelas').value = 'VII A';
+                document.getElementById('globalMapel').value = 'Matematika';
+            }
+
             syncGlobalFilters();
         }
 
@@ -496,6 +582,10 @@
 
         function handleSaveMaster(e) {
             e.preventDefault();
+            if(isDemoMode) {
+                alert("Mode Demo Pratinjau: Fitur penambahan master data dinonaktifkan untuk menjaga kestabilan tampilan demo.");
+                return;
+            }
             const cat = document.getElementById('masterCategory').value;
             if(cat === 'tahun' || cat === 'kelas' || cat === 'mapel') {
                 const val = document.getElementById('mVal1').value.trim();
@@ -512,6 +602,10 @@
         }
 
         function deleteMaster(cat, i) {
+            if(isDemoMode) {
+                alert("Mode Demo Pratinjau: Fitur hapus data dinonaktifkan.");
+                return;
+            }
             if(confirm('Hapus item ini?')) {
                 store[cat].splice(i, 1);
                 saveLocalStore();
@@ -521,6 +615,10 @@
         }
 
         function clearCurrentMaster() {
+            if(isDemoMode) {
+                alert("Mode Demo Pratinjau: Fitur pembersihan master data dinonaktifkan.");
+                return;
+            }
             const cat = document.getElementById('masterCategory').value;
             if(confirm(`Hapus semua data ${cat}?`)) {
                 store[cat] = [];
@@ -540,6 +638,11 @@
         }
 
         function handleExcelUpload(e) {
+            if(isDemoMode) {
+                alert("Mode Demo Pratinjau: Impor file Excel dinonaktifkan.");
+                e.target.value = '';
+                return;
+            }
             const file = e.target.files[0];
             if(!file) return;
             const reader = new FileReader();
@@ -575,12 +678,20 @@
             document.getElementById('inputNilaiTbody').innerHTML = listS.map((siswa, idx) => {
                 const key = `${t}_${s}_${k}_${m}_${siswa.id}`;
                 const saved = store.nilai[key] || {};
-                let inputs = listTP.map(tp => `<td><input type="number" class="form-control form-control-sm text-center" value="${saved[tp.id]||''}" onchange="saveNilai('${key}', '${tp.id}', this.value)"></td>`).join('');
-                return `<tr><td>${idx+1}</td><td>${siswa.nisn}</td><td class="fw-semibold">${siswa.nama}</td>${inputs}<td><input type="number" class="form-control form-control-sm text-center fw-bold" value="${saved['ats']||''}" onchange="saveNilai('${key}', 'ats', this.value)"></td><td>${saved['ats']!==undefined ? '<span class="badge bg-success">🟢 Lengkap</span>':'<span class="badge bg-warning text-dark">🟡 Belum</span>'}</td></tr>`;
+                let inputs = listTP.map(tp => `<td><input type="number" class="form-control form-control-sm text-center" value="${saved[tp.id]!==undefined ? saved[tp.id] : ''}" onchange="saveNilai('${key}', '${tp.id}', this.value)"></td>`).join('');
+                return `<tr><td>${idx+1}</td><td>${siswa.nisn}</td><td class="fw-semibold">${siswa.nama}</td>${inputs}<td><input type="number" class="form-control form-control-sm text-center fw-bold" value="${saved['ats']!==undefined ? saved['ats'] : ''}" onchange="saveNilai('${key}', 'ats', this.value)"></td><td>${saved['ats']!==undefined ? '<span class="badge bg-success">🟢 Lengkap</span>':'<span class="badge bg-warning text-dark">🟡 Belum</span>'}</td></tr>`;
             }).join('');
         }
 
         function saveNilai(key, field, val) {
+            if(isDemoMode) {
+                // Di mode demo, ubah sementara nilai di memory tanpa menyimpan ke storage
+                if(!store.nilai[key]) store.nilai[key] = {};
+                if(val === '') delete store.nilai[key][field]; else store.nilai[key][field] = parseFloat(val);
+                renderInputNilaiTable();
+                renderRekapTable();
+                return;
+            }
             if(!store.nilai[key]) store.nilai[key] = {};
             if(val === '') delete store.nilai[key][field]; else store.nilai[key][field] = parseFloat(val);
             saveLocalStore();
@@ -617,7 +728,13 @@
         // Cetak Rapor Preview & QR
         function updateSiswaCetakDropdown() {
             const k = document.getElementById('globalKelas').value;
-            document.getElementById('selectSiswaCetak').innerHTML = '<option value="">-- Pilih Siswa --</option>' + store.siswa.filter(s => s.kelas === k).map(s => `<option value="${s.id}">${s.nama}</option>`).join('');
+            const listFiltered = store.siswa.filter(s => s.kelas === k);
+            document.getElementById('selectSiswaCetak').innerHTML = '<option value="">-- Pilih Siswa --</option>' + listFiltered.map(s => `<option value="${s.id}">${s.nama}</option>`).join('');
+            
+            // Auto-select siswa pertama di mode demo
+            if(isDemoMode && listFiltered.length > 0) {
+                document.getElementById('selectSiswaCetak').value = listFiltered[0].id;
+            }
             renderRaporPreview();
         }
 
@@ -666,17 +783,25 @@
                 </div>
             `;
             setTimeout(() => {
-                new QRCode(document.getElementById('qrArea'), { text: `VALID|${siswa.nisn}|${siswa.nama}|${na}`, width: 70, height: 70 });
+                const qrContainer = document.getElementById('qrArea');
+                if(qrContainer) {
+                    qrContainer.innerHTML = '';
+                    new QRCode(qrContainer, { text: `VALID|${siswa.nisn}|${siswa.nama}|${na}`, width: 70, height: 70 });
+                }
             }, 100);
         }
 
         // Search Portal Siswa Logic
         function searchPortalSiswa() {
             loadLocalStore();
-            const key = document.getElementById('searchSiswaKey').value.trim().toLowerCase();
+            let key = document.getElementById('searchSiswaKey').value.trim().toLowerCase();
             const area = document.getElementById('portalResultArea');
 
-            if(!key) {
+            // Jika dalam mode demo dan input kosong, berikan pencarian default otomatis
+            if(!key && isDemoMode) {
+                key = "ahmad fauzi";
+                document.getElementById('searchSiswaKey').value = "Ahmad Fauzi";
+            } else if(!key) {
                 area.innerHTML = `<div class="alert alert-warning text-center">Silakan ketik NISN atau Nama Siswa terlebih dahulu.</div>`;
                 return;
             }
@@ -743,7 +868,20 @@
             }).join('');
         }
 
+        function openSettingsModal() {
+            if(isDemoMode) {
+                alert("Mode Demo Pratinjau: Pengaturan koneksi Firebase/AI dinonaktifkan.");
+                return;
+            }
+            const modal = new bootstrap.Modal(document.getElementById('modalSettings'));
+            modal.show();
+        }
+
         function saveSettings() {
+            if(isDemoMode) {
+                alert("Mode Demo Pratinjau: Perubahan pengaturan tidak dapat disimpan.");
+                return;
+            }
             localStorage.setItem('e_nilai_fb_config', document.getElementById('cfgFirebaseConfig').value);
             localStorage.setItem('e_nilai_gemini_model', document.getElementById('cfgGeminiModel').value);
             alert('Pengaturan tersimpan!');
