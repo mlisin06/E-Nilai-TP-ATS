@@ -878,16 +878,39 @@
             modal.show();
         }
 
+  
         function saveSettings() {
-            if(isDemoMode) {
-                alert("Mode Demo Pratinjau: Perubahan pengaturan tidak dapat disimpan.");
-                return;
+            const rawFb = document.getElementById('cfgFirebaseConfig').value;
+            const model = document.getElementById('cfgGeminiModel').value;
+
+            localStorage.setItem('e_nilai_fb_config', rawFb);
+            localStorage.setItem('e_nilai_gemini_model', model);
+
+            if(rawFb.trim()) {
+                try {
+                    // Eksekusi teks config langsung menjadi objek JavaScript
+                    const configObj = new Function(`
+                        ${rawFb}
+                        return firebaseConfig;
+                    `)();
+
+                    if(configObj && configObj.databaseURL && window.initFirebaseSystem) {
+                        window.initFirebaseSystem(configObj);
+                        alert('Firebase berhasil terhubung!');
+                    } else {
+                        alert('Format konfigurasi Firebase kurang lengkap.');
+                    }
+                } catch(err) {
+                    console.error(err);
+                    alert('Gagal membaca kode Firebase. Pastikan format penulisan benar.');
+                }
+            } else {
+                alert('Pengaturan disimpan dalam Mode Offline.');
             }
-            localStorage.setItem('e_nilai_fb_config', document.getElementById('cfgFirebaseConfig').value);
-            localStorage.setItem('e_nilai_gemini_model', document.getElementById('cfgGeminiModel').value);
-            alert('Pengaturan tersimpan!');
         }
-    </script>
+    </script> <!-- <-- Tutup tag script utama di sini -->
+    
+    <!-- Bootstrap JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
